@@ -1,0 +1,165 @@
+package main_old
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/chromedp/cdproto/runtime"
+	"github.com/chromedp/chromedp"
+	"github.com/ezydark/ezHead/libs/perplexity"
+	"github.com/ezydark/ezforce/libs/logger"
+	"github.com/fatih/color"
+	"github.com/rs/zerolog/log"
+)
+
+func main() {
+	// Initialize logger
+	err := logger.Init()
+	if err != nil {
+		fatal_tag := color.New(color.FgRed, color.Bold).Sprintf("[FATAL]")
+		fmt.Println(fatal_tag, "Could not initialize custom logger:\n", err)
+		return
+	}
+
+	// Get the Local AppData path using environment variable
+	localAppData := os.Getenv("LOCALAPPDATA")
+	if localAppData == "" {
+		// Fallback for older Windows versions
+		userProfile := os.Getenv("USERPROFILE")
+		localAppData = filepath.Join(userProfile, "AppData", "Local")
+	}
+
+	// Construct path with dynamic username
+	userDataDir := filepath.Join(localAppData, "ezHead")
+
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.ExecPath("C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"),
+		chromedp.Flag("headless", true),
+		chromedp.UserDataDir(userDataDir),
+		chromedp.Flag("profile-directory", "Default"),
+		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"),
+		chromedp.Flag("disable-sync", true),
+		chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-web-security", true),
+		chromedp.Flag("disable-features", "IsolateOrigins,site-per-process"),
+		chromedp.Flag("ignore-certificate-errors", true),
+		chromedp.Flag("enable-automation", false),
+		chromedp.Flag("disable-extensions", false),
+		chromedp.Flag("start-maximized", true),
+		// Extension to automatically bypass Captchas named "NopeCHA"
+		chromedp.Flag("load-extension", filepath.Join(localAppData, "ezHead", "chromium_automation")),
+	)
+
+	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	// Add a timeout
+	ctx, cancel = context.WithTimeout(ctx, 120*time.Second)
+	defer cancel()
+
+	// Variable to store the page title
+	var title string
+
+	fileBytes, err := os.ReadFile("ask_req2.js")
+	if err != nil {
+		log.Error().Msgf("Failed to read file: %v", err)
+		return
+	}
+	fetchJS := string(fileBytes)
+
+	// Variable to store the response
+	var response json.RawMessage
+
+	// Run the browser automation tasks
+	err = chromedp.Run(ctx,
+		// Navigate to perplexity.ai
+		chromedp.Navigate("https://www.perplexity.ai"),
+
+		// Wait for the textarea with the placeholder to be visible
+		chromedp.WaitVisible(`textarea[placeholder="Ask anything..."]`, chromedp.ByQuery),
+
+		// Get the page title
+		chromedp.Title(&title),
+
+		chromedp.Evaluate(fetchJS, &response, func(p *runtime.EvaluateParams) *runtime.EvaluateParams {
+			return p.WithAwaitPromise(true)
+		}),
+	)
+
+	if err != nil {
+		log.Fatal().Msgf("Error during automation:\n%v", err)
+	}
+
+	// Parse the JSON result into the structured Response type
+	var perplexityResponse perplexity.Response
+	if err := json.Unmarshal(response, &perplexityResponse); err != nil {
+		log.Fatal().Msgf("Error parsing result: %v, Raw response: %s", err, string(response))
+	}
+
+	finalAnswer, err := perplexityResponse.FinalMessage.GetFinalAnswer()
+	if err != nil {
+		log.Error().Msgf("Error getting final answer: %v", err)
+	} else if finalAnswer != "" {
+		log.Info().Msgf("Final answer: %s", finalAnswer)
+	}
+
+	// For debugging: Print the full structured response
+	// prettyJSON, _ := json.MarshalIndent(perplexityResponse, "", "  ")
+	// log.Debug().Msgf("Full response structure: \n%s", prettyJSON)
+
+	// Log basic information about the response
+	// log.Info().Msgf("Query: %s", perplexityResponse.FinalMessage.QueryStr)
+	// log.Info().Msgf("Status: %s", perplexityResponse.FinalMessage.Status)
+	// log.Info().Msgf("Model used: %s", perplexityResponse.FinalMessage.DisplayModel)
+
+	// // Parse the nested Text field which contains JSON steps
+	// if err := perplexityResponse.FinalMessage.UnmarshalSteps(); err != nil {
+	// 	log.Error().Msgf("Error parsing steps: %v", err)
+	// } else {
+	// 	log.Info().Msgf("Found %d steps in response", len(perplexityResponse.FinalMessage.ParsedSteps))
+
+	// 	// Extract the final answer text
+	// 	finalAnswer, err := perplexityResponse.FinalMessage.GetFinalAnswer()
+	// 	if err != nil {
+	// 		log.Error().Msgf("Error getting final answer: %v", err)
+	// 	} else if finalAnswer != "" {
+	// 		log.Info().Msgf("Final answer: %s", finalAnswer)
+	// 	}
+	// }
+
+	// log.Info().Msgf("Sources: %s", perplexityResponse.FinalMessage.Sources)
+
+	// // Get the response timestamp
+	// timestamp, err := perplexityResponse.FinalMessage.ParsedTime()
+	// if err != nil {
+	// 	log.Error().Msgf("Error parsing timestamp: %v", err)
+	// } else {
+	// 	log.Info().Msgf("Response timestamp: %s", timestamp.Format(time.RFC3339))
+	// }
+
+	// // Extract reasoning plan goals if available
+	// if len(perplexityResponse.FinalMessage.ReasoningPlan.Goals) > 0 {
+	// 	log.Info().Msg("Reasoning plan goals:")
+	// 	for i, goal := range perplexityResponse.FinalMessage.ReasoningPlan.Goals {
+	// 		log.Info().Msgf("  %d. %s", i+1, goal.Description)
+	// 	}
+	// }
+
+	// // Extract related queries
+	// if len(perplexityResponse.FinalMessage.RelatedQueries) > 0 {
+	// 	log.Info().Msg("Related queries:")
+	// 	for i, query := range perplexityResponse.FinalMessage.RelatedQueries {
+	// 		log.Info().Msgf("  %d. %s", i+1, query)
+	// 	}
+	// }
+
+	log.Info().Msgf("Successfully loaded Perplexity. Page title: %s", title)
+}
