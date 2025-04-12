@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,34 +54,22 @@ func main() {
 	page.MustSetUserAgent(&proto.NetworkSetUserAgentOverride{
 		UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0",
 	})
+	page.MustSetViewport(1920, 1080, 1.0, false)
 
-	// Execute custom request
-	headerJSON, err := perplexity.DefaultHeaders().IntoJSON()
+	perplex, err := perplexity.Init()
 	if err != nil {
-		log.Fatal().Msgf("Could not convert headers to JSON:\n%v", err)
+		log.Fatal().Msgf("Could not initialize Perplexity struct:\n%v", err)
 	}
-	bodyJSON, err := perplexity.DefaultBody().IntoJSON()
+	res, err := perplex.SendRequest(page, "Is this working, lul? <3")
 	if err != nil {
-		log.Fatal().Msgf("Could not convert body to JSON:\n%v", err)
-	}
-	jsScript := perplexity.DefaultJsScript(headerJSON, bodyJSON)
-	page.MustElement(`textarea[placeholder="Ask anything..."]`)
-	result := page.MustEval(jsScript)
-	resultJSON, err := result.MarshalJSON()
-	if err != nil {
-		log.Fatal().Msgf("Could not convert result to JSON:\n%v", err)
-	}
-	var perplexityResponse perplexity.Response
-	if err := json.Unmarshal(resultJSON, &perplexityResponse); err != nil {
-		prettyJSON := result.JSON("", "  ")
-		log.Fatal().Msgf("Error parsing result:\n%v\nRaw response:\n%s", err, prettyJSON)
-	}
-	finalAnswer, err := perplexityResponse.FinalMessage.GetFinalAnswer()
-	if err != nil {
-		log.Error().Msgf("Error getting final answer: %v", err)
-	} else if finalAnswer != "" {
-		log.Info().Msgf("Final answer: %s", finalAnswer)
+		log.Fatal().Msgf("Could not send request to Perplexity:\n%v", err)
 	}
 
-	time.Sleep(time.Hour)
+	finalAnswer, err := res.FinalMessage.GetFinalAnswer()
+	if err != nil {
+		log.Fatal().Msgf("Could not get final answer from Perplexity:\n%v", err)
+	}
+	log.Info().Msgf("Final Answer:\n%s", finalAnswer)
+
+	// time.Sleep(time.Hour)
 }

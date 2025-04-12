@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type Headers struct {
+type RequestHeaders struct {
 	Accept                 string `json:"accept"`
 	AcceptLanguage         string `json:"accept-language"`
 	ContentType            string `json:"content-type"`
@@ -62,86 +62,19 @@ type RequestBody struct {
 	QueryStr string `json:"query_str"`
 }
 
-func DefaultHeaders() Headers {
-	return Headers{
-		Accept:                 "text/event-stream",
-		AcceptLanguage:         "cs,en-US;q=0.9,en;q=0.8",
-		ContentType:            "application/json",
-		Priority:               "u=1, i",
-		SecChUa:                "\"Microsoft Edge\";v=\"135\", \"Not-A.Brand\";v=\"8\", \"Chromium\";v=\"135\"",
-		SecChUaArch:            "\"x86\"",
-		SecChUaBitness:         "\"64\"",
-		SecChUaFullVersion:     "\"135.0.3179.54\"",
-		SecChUaFullVersionList: "\"Microsoft Edge\";v=\"135.0.3179.54\", \"Not-A.Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.7049.42\"",
-		SecChUaMobile:          "?0",
-		SecChUaModel:           "\"\"",
-		SecChUaPlatform:        "\"Windows\"",
-		SecChUaPlatformVersion: "\"19.0.0\"",
-		SecFetchDest:           "empty",
-		SecFetchMode:           "cors",
-		SecFetchSite:           "same-origin",
-	}
-}
+type RequestScript string
 
-func DefaultBody() RequestBody {
-	return RequestBody{
-		Params: Params{
-			LastBackendUUID:            "9f0a26f5-48c4-4c1d-b97c-49141d4c1946",
-			ReadWriteToken:             "a25454be-e94d-4a63-b04e-05116abfa1d1",
-			Attachments:                []string{},
-			Language:                   "en-US",
-			Timezone:                   "Europe/Prague",
-			SearchFocus:                "internet",
-			Sources:                    []string{"web"},
-			FrontendUUID:               "0447638c-f6fe-4fe8-9cf6-d3b518634b45",
-			Mode:                       "copilot",
-			ModelPreference:            "claude37sonnetthinking",
-			IsRelatedQuery:             false,
-			IsSponsored:                false,
-			VisitorID:                  "7ddb064a-37a6-4058-92f4-f94000fb00cf",
-			UserNextauthID:             "76732ce2-a124-40cb-a0ce-db657d4344b9",
-			PromptSource:               "user",
-			QuerySource:                "followup",
-			LocalSearchEnabled:         true,
-			BrowserHistorySummary:      []string{},
-			IsIncognito:                false,
-			UseSchematizedAPI:          true,
-			SendBackTextInStreamingAPI: false,
-			SupportedBlockUseCases: []string{
-				"answer_modes", "media_items", "knowledge_cards", "inline_entity_cards",
-				"place_widgets", "finance_widgets", "sports_widgets", "shopping_widgets",
-				"jobs_widgets", "search_result_widgets", "entity_list_answer", "todo_list",
-			},
-			ClientCoordinates:        nil,
-			IsNavSuggestionsDisabled: false,
-			FollowupSource:           "link",
-			Version:                  "2.18",
-		},
-		QueryStr: "Default query: Give me some golang code examples",
-	}
-}
-
-// Convert structs to JSON
-func (h Headers) IntoJSON() ([]byte, error) {
-	JSON, err := json.Marshal(h)
+func (s *RequestScript) Update(headers *RequestHeaders, body *RequestBody) *RequestScript {
+	headersJSON, err := headers.IntoJSON()
 	if err != nil {
-		log.Fatal().Msgf("Error marshaling headers: %v", err)
+		log.Fatal().Msgf("Failed to convert headers to JSON: %v", err)
 	}
-	return JSON, nil
-}
-
-func (b RequestBody) IntoJSON() ([]byte, error) {
-	JSON, err := json.Marshal(b)
+	bodyJSON, err := body.IntoJSON()
 	if err != nil {
-		log.Fatal().Msgf("Error marshaling body: %v", err)
+		log.Fatal().Msgf("Failed to convert body to JSON: %v", err)
 	}
-	return JSON, nil
-}
 
-func DefaultJsScript(headersJSON, bodyJSON []byte) string {
-	// backtick := "`"
-
-	jsScript := fmt.Sprintf(`
+	jscript := fmt.Sprintf(`
 async () => {
     // ADDED: Top-level try block to catch ANY error within the async function
     try {
@@ -230,6 +163,81 @@ async () => {
     }
 };
 	`, headersJSON, bodyJSON)
+	rs := RequestScript(jscript)
+	return &rs
+}
 
-	return jsScript
+func (h *RequestHeaders) Default() *RequestHeaders {
+	h.Accept = "text/event-stream"
+	h.AcceptLanguage = "cs,en-US;q=0.9,en;q=0.8"
+	h.ContentType = "application/json"
+	h.Priority = "u=1, i"
+	h.SecChUa = "\"Microsoft Edge\";v=\"135\", \"Not-A.Brand\";v=\"8\", \"Chromium\";v=\"135\""
+	h.SecChUaArch = "\"x86\""
+	h.SecChUaBitness = "\"64\""
+	h.SecChUaFullVersion = "\"135.0.3179.54\""
+	h.SecChUaFullVersionList = "\"Microsoft Edge\";v=\"135.0.3179.54\", \"Not-A.Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.7049.42\""
+	h.SecChUaMobile = "?0"
+	h.SecChUaModel = "\"\""
+	h.SecChUaPlatform = "\"Windows\""
+	h.SecChUaPlatformVersion = "\"19.0.0\""
+	h.SecFetchDest = "empty"
+	h.SecFetchMode = "cors"
+	h.SecFetchSite = "same-origin"
+
+	return h
+}
+
+func (b *RequestBody) Default() *RequestBody {
+	b.Params = Params{
+		LastBackendUUID:            "9f0a26f5-48c4-4c1d-b97c-49141d4c1946",
+		ReadWriteToken:             "a25454be-e94d-4a63-b04e-05116abfa1d1",
+		Attachments:                []string{},
+		Language:                   "en-US",
+		Timezone:                   "Europe/Prague",
+		SearchFocus:                "internet",
+		Sources:                    []string{"web"},
+		FrontendUUID:               "0447638c-f6fe-4fe8-9cf6-d3b518634b45",
+		Mode:                       "copilot",
+		ModelPreference:            "claude37sonnetthinking",
+		IsRelatedQuery:             false,
+		IsSponsored:                false,
+		VisitorID:                  "7ddb064a-37a6-4058-92f4-f94000fb00cf",
+		UserNextauthID:             "76732ce2-a124-40cb-a0ce-db657d4344b9",
+		PromptSource:               "user",
+		QuerySource:                "followup",
+		LocalSearchEnabled:         true,
+		BrowserHistorySummary:      []string{},
+		IsIncognito:                false,
+		UseSchematizedAPI:          true,
+		SendBackTextInStreamingAPI: false,
+		SupportedBlockUseCases: []string{
+			"answer_modes", "media_items", "knowledge_cards", "inline_entity_cards",
+			"place_widgets", "finance_widgets", "sports_widgets", "shopping_widgets",
+			"jobs_widgets", "search_result_widgets", "entity_list_answer", "todo_list",
+		},
+		ClientCoordinates:        nil,
+		IsNavSuggestionsDisabled: false,
+		FollowupSource:           "link",
+		Version:                  "2.18",
+	}
+	b.QueryStr = "Default query: Give me some golang code examples"
+
+	return b
+}
+
+func (h *RequestHeaders) IntoJSON() ([]byte, error) {
+	JSON, err := json.Marshal(&h)
+	if err != nil {
+		log.Fatal().Msgf("Error marshaling headers: %v", err)
+	}
+	return JSON, nil
+}
+
+func (b *RequestBody) IntoJSON() ([]byte, error) {
+	JSON, err := json.Marshal(&b)
+	if err != nil {
+		log.Fatal().Msgf("Error marshaling body: %v", err)
+	}
+	return JSON, nil
 }
