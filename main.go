@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/ezydark/ezHead/libs/api/client"
+	"github.com/ezydark/ezHead/libs/api/server"
 	"github.com/ezydark/ezHead/libs/perplexity"
 	"github.com/ezydark/ezforce/libs/logger"
 	"github.com/fatih/color"
@@ -24,6 +27,32 @@ func main() {
 		return
 	}
 
+	http.HandleFunc("/v1/chat/completions", server.AuthMiddleware(server.HandleChatCompletions))
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	log.Info().Msg("OpenAI-compatible server starting on port 8080...")
+	serverErrors := make(chan error, 1)
+	go func() {
+		serverErrors <- http.ListenAndServe(":8080", nil)
+	}()
+	go func() {
+		select {
+		case err := <-serverErrors:
+			if err != nil && err != http.ErrServerClosed {
+				log.Fatal().Err(err).Msg("Server error while starting")
+			} else if err == http.ErrServerClosed {
+				log.Info().Msg("Server closed")
+			}
+		}
+	}()
+
+	client.TestServer()
+
+	time.Sleep(time.Hour)
+
 	localAppData := os.Getenv("LOCALAPPDATA")
 	if localAppData == "" {
 		// Fallback for older Windows versions
@@ -33,7 +62,7 @@ func main() {
 	userDataDir := filepath.Join(localAppData, "ezHead")
 
 	u := launcher.New().
-		Headless(false).
+		Headless(true).
 		UserDataDir(userDataDir).
 		ProfileDir("Default").
 		NoSandbox(true).
