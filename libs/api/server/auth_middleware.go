@@ -17,8 +17,6 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// Validate the API key here
-		// Remove "Bearer " prefix and check against your stored keys
 		// key := strings.TrimPrefix(apiKey, "Bearer ")
 		if false {
 			http.Error(w, "Unauthorized: Invalid API key", http.StatusUnauthorized)

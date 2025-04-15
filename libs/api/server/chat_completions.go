@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	openai "github.com/sashabaranov/go-openai"
+	"github.com/sashabaranov/go-openai"
 )
 
 func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	// log.Debug().Msgf("Got request:\n%v", r)
 
-	// if r.Method == http.MethodOptions {
-	// 	w.WriteHeader(http.StatusOK)
-	// 	return
-	// }
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -53,9 +53,9 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 
 	// Return the response using OpenAI's response type
 	w.Header().Set("Content-Type", "application/json")
-	// w.Header().Set("Access-Control-Allow-Origin", "*")
-	// w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	// w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	err = json.NewEncoder(w).Encode(response)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to encode response")
@@ -96,9 +96,9 @@ func ProcessChat(request openai.ChatCompletionRequest) openai.ChatCompletionResp
 }
 
 func handleStreamingResponse(w http.ResponseWriter, request openai.ChatCompletionRequest) {
-	// w.Header().Set("Content-Type", "text/event-stream")
-	// w.Header().Set("Cache-Control", "no-cache")
-	// w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {

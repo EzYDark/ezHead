@@ -2,47 +2,49 @@ package perplexity
 
 import (
 	"encoding/json"
-	"errors"
 
+	"github.com/ezydark/ezHead/libs/perplexity/request"
 	"github.com/go-rod/rod"
 	"github.com/rs/zerolog/log"
 )
 
-type Perplexity struct {
-	RequestHeaders *RequestHeaders
-	RequestBody    *RequestBody
-	RequestScript  *RequestScript
+type PerplexityReq struct {
+	ReqHeaders *request.Headers
+	ReqBody    *request.Body
+	ReqScript  *request.Script
 }
 
-var perplex *Perplexity
-
-func Init() (*Perplexity, error) {
-	if perplex != nil {
-		return nil, errors.New("perplexity struct already initialized")
+// Initialize new chat session on Perplexity
+func Init() (*PerplexityReq, error) {
+	new_perplex := &PerplexityReq{
+		ReqHeaders: new(request.Headers),
+		ReqBody:    new(request.Body),
+		ReqScript:  new(request.Script),
 	}
 
-	perplex = &Perplexity{
-		RequestHeaders: new(RequestHeaders),
-		RequestBody:    new(RequestBody),
-		RequestScript:  new(RequestScript),
-	}
+	new_perplex.ReqHeaders = new_perplex.ReqHeaders.Default()
+	new_perplex.ReqBody = new_perplex.ReqBody.Default()
+	new_perplex.ReqScript = new_perplex.ReqScript.Update(new_perplex.ReqHeaders, new_perplex.ReqBody)
 
-	perplex.RequestHeaders = perplex.RequestHeaders.Default()
-	perplex.RequestBody = perplex.RequestBody.Default()
-	perplex.RequestScript = perplex.RequestScript.Update(perplex.RequestHeaders, perplex.RequestBody)
-
-	return perplex, nil
+	return new_perplex, nil
 }
 
-func (p *Perplexity) SendRequest(page *rod.Page, query string) (Response, error) {
-	p.RequestBody.QueryStr = query
-	p.RequestScript = p.RequestScript.Update(p.RequestHeaders, p.RequestBody)
+func (p *PerplexityReq) SetChatSession(ChatUUID string) *PerplexityReq {
+	p.ReqBody.ToFollowup(ChatUUID)
+	p.ReqScript = p.ReqScript.Update(p.ReqHeaders, p.ReqBody)
+
+	return p
+}
+
+func (p *PerplexityReq) SendRequest(page *rod.Page, query string) (Response, error) {
+	p.ReqBody.QueryStr = query
+	p.ReqScript = p.ReqScript.Update(p.ReqHeaders, p.ReqBody)
 
 	// Wait for the page to fully load
 	page.MustWaitStable()
 
 	// Run JS script and send the request
-	result := page.MustEval(string(*p.RequestScript))
+	result := page.MustEval(string(*p.ReqScript))
 
 	// Convert result from the JS script to JSON
 	resultJSON, err := result.MarshalJSON()
@@ -56,15 +58,21 @@ func (p *Perplexity) SendRequest(page *rod.Page, query string) (Response, error)
 		log.Fatal().Msgf("Error parsing result:\n%v", err)
 	}
 
+	// Set specific chat session identifier to allow followup messages
+	if !p.ReqBody.IsFollowup() {
+		p.ReqBody.ToFollowup(perplexityResponse.FinalMessage.BackendUUID)
+		p.ReqScript = p.ReqScript.Update(p.ReqHeaders, p.ReqBody)
+	}
+
 	return perplexityResponse, nil
 }
 
-func (p *Perplexity) SetHeaders(headers *RequestHeaders) {
-	p.RequestHeaders = headers
-	p.RequestScript = p.RequestScript.Update(p.RequestHeaders, p.RequestBody)
+func (p *PerplexityReq) SetHeaders(headers *request.Headers) {
+	p.ReqHeaders = headers
+	p.ReqScript = p.ReqScript.Update(p.ReqHeaders, p.ReqBody)
 }
 
-func (p *Perplexity) SetBody(body *RequestBody) {
-	p.RequestBody = body
-	p.RequestScript = p.RequestScript.Update(p.RequestHeaders, p.RequestBody)
+func (p *PerplexityReq) SetBody(body *request.Body) {
+	p.ReqBody = body
+	p.ReqScript = p.ReqScript.Update(p.ReqHeaders, p.ReqBody)
 }

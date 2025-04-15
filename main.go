@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net/http"
 	"os"
@@ -51,7 +52,7 @@ func main() {
 
 	client.TestServer()
 
-	time.Sleep(time.Hour)
+	// time.Sleep(time.Hour)
 
 	localAppData := os.Getenv("LOCALAPPDATA")
 	if localAppData == "" {
@@ -89,16 +90,29 @@ func main() {
 	if err != nil {
 		log.Fatal().Msgf("Could not initialize Perplexity struct:\n%v", err)
 	}
-	res, err := perplex.SendRequest(page, "Is this working, lul? <3")
-	if err != nil {
-		log.Fatal().Msgf("Could not send request to Perplexity:\n%v", err)
-	}
 
-	finalAnswer, err := res.FinalMessage.GetFinalAnswer()
-	if err != nil {
-		log.Fatal().Msgf("Could not get final answer from Perplexity:\n%v", err)
-	}
-	log.Info().Msgf("Final Answer:\n%s", finalAnswer)
+	for {
+		fmt.Println("\n\nEnter new query to send to Perplexity >> ")
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			query := scanner.Text()
 
-	// time.Sleep(time.Hour)
+			res, err := perplex.SendRequest(page, query)
+			if err != nil {
+				log.Fatal().Msgf("Could not send request to Perplexity:\n%v", err)
+			}
+
+			finalAnswer, err := res.FinalMessage.GetFinalAnswer()
+			if err != nil {
+				log.Fatal().Msgf("Could not get final answer from Perplexity:\n%v", err)
+			}
+			log.Info().Msgf("Final Answer:\n%s", finalAnswer)
+		}
+
+		if err := scanner.Err(); err != nil {
+			log.Fatal().Err(err).Msg("Error reading input")
+		}
+
+		// time.Sleep(time.Hour)
+	}
 }

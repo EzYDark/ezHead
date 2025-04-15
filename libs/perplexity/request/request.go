@@ -1,70 +1,14 @@
-package perplexity
+package request
 
 import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
-type RequestHeaders struct {
-	Accept                 string `json:"accept"`
-	AcceptLanguage         string `json:"accept-language"`
-	ContentType            string `json:"content-type"`
-	Priority               string `json:"priority"`
-	SecChUa                string `json:"sec-ch-ua"`
-	SecChUaArch            string `json:"sec-ch-ua-arch"`
-	SecChUaBitness         string `json:"sec-ch-ua-bitness"`
-	SecChUaFullVersion     string `json:"sec-ch-ua-full-version"`
-	SecChUaFullVersionList string `json:"sec-ch-ua-full-version-list"`
-	SecChUaMobile          string `json:"sec-ch-ua-mobile"`
-	SecChUaModel           string `json:"sec-ch-ua-model"`
-	SecChUaPlatform        string `json:"sec-ch-ua-platform"`
-	SecChUaPlatformVersion string `json:"sec-ch-ua-platform-version"`
-	SecFetchDest           string `json:"sec-fetch-dest"`
-	SecFetchMode           string `json:"sec-fetch-mode"`
-	SecFetchSite           string `json:"sec-fetch-site"`
-}
-
-// Define your request parameters structure
-type Params struct {
-	LastBackendUUID            string      `json:"last_backend_uuid"`
-	ReadWriteToken             string      `json:"read_write_token"`
-	Attachments                []string    `json:"attachments"`
-	Language                   string      `json:"language"`
-	Timezone                   string      `json:"timezone"`
-	SearchFocus                string      `json:"search_focus"`
-	Sources                    []string    `json:"sources"`
-	FrontendUUID               string      `json:"frontend_uuid"`
-	Mode                       string      `json:"mode"`
-	ModelPreference            string      `json:"model_preference"`
-	IsRelatedQuery             bool        `json:"is_related_query"`
-	IsSponsored                bool        `json:"is_sponsored"`
-	VisitorID                  string      `json:"visitor_id"`
-	UserNextauthID             string      `json:"user_nextauth_id"`
-	PromptSource               string      `json:"prompt_source"`
-	QuerySource                string      `json:"query_source"`
-	LocalSearchEnabled         bool        `json:"local_search_enabled"`
-	BrowserHistorySummary      []string    `json:"browser_history_summary"`
-	IsIncognito                bool        `json:"is_incognito"`
-	UseSchematizedAPI          bool        `json:"use_schematized_api"`
-	SendBackTextInStreamingAPI bool        `json:"send_back_text_in_streaming_api"`
-	SupportedBlockUseCases     []string    `json:"supported_block_use_cases"`
-	ClientCoordinates          interface{} `json:"client_coordinates"`
-	IsNavSuggestionsDisabled   bool        `json:"is_nav_suggestions_disabled"`
-	FollowupSource             string      `json:"followup_source"`
-	Version                    string      `json:"version"`
-}
-
-// Define your request body structure
-type RequestBody struct {
-	Params   Params `json:"params"`
-	QueryStr string `json:"query_str"`
-}
-
-type RequestScript string
-
-func (s *RequestScript) Update(headers *RequestHeaders, body *RequestBody) *RequestScript {
+func (s *Script) Update(headers *Headers, body *Body) *Script {
 	headersJSON, err := headers.IntoJSON()
 	if err != nil {
 		log.Fatal().Msgf("Failed to convert headers to JSON: %v", err)
@@ -163,11 +107,11 @@ async () => {
     }
 };
 	`, headersJSON, bodyJSON)
-	rs := RequestScript(jscript)
+	rs := Script(jscript)
 	return &rs
 }
 
-func (h *RequestHeaders) Default() *RequestHeaders {
+func (h *Headers) Default() *Headers {
 	h.Accept = "text/event-stream"
 	h.AcceptLanguage = "cs,en-US;q=0.9,en;q=0.8"
 	h.ContentType = "application/json"
@@ -175,8 +119,8 @@ func (h *RequestHeaders) Default() *RequestHeaders {
 	h.SecChUa = "\"Microsoft Edge\";v=\"135\", \"Not-A.Brand\";v=\"8\", \"Chromium\";v=\"135\""
 	h.SecChUaArch = "\"x86\""
 	h.SecChUaBitness = "\"64\""
-	h.SecChUaFullVersion = "\"135.0.3179.54\""
-	h.SecChUaFullVersionList = "\"Microsoft Edge\";v=\"135.0.3179.54\", \"Not-A.Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.7049.42\""
+	h.SecChUaFullVersion = "\"135.0.3179.73\""
+	h.SecChUaFullVersionList = "\"Microsoft Edge\";v=\"135.0.3179.73\", \"Not-A.Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"135.0.7049.85\""
 	h.SecChUaMobile = "?0"
 	h.SecChUaModel = "\"\""
 	h.SecChUaPlatform = "\"Windows\""
@@ -188,25 +132,24 @@ func (h *RequestHeaders) Default() *RequestHeaders {
 	return h
 }
 
-func (b *RequestBody) Default() *RequestBody {
+func (b *Body) Default() *Body {
 	b.Params = Params{
-		LastBackendUUID:            "9f0a26f5-48c4-4c1d-b97c-49141d4c1946",
-		ReadWriteToken:             "a25454be-e94d-4a63-b04e-05116abfa1d1",
 		Attachments:                []string{},
 		Language:                   "en-US",
 		Timezone:                   "Europe/Prague",
 		SearchFocus:                "internet",
-		Sources:                    []string{"web"},
-		FrontendUUID:               "0447638c-f6fe-4fe8-9cf6-d3b518634b45",
+		Sources:                    []string{"web", "scholar", "social"},
+		FrontendUUID:               "7eb6747b-9df3-4821-be2e-40c2fe5e7476", // Some random UUID (Unimportant)
 		Mode:                       "copilot",
-		ModelPreference:            "claude37sonnetthinking",
+		ModelPreference:            "gemini2flash",
+		SearchRecencyFilter:        nil,
 		IsRelatedQuery:             false,
 		IsSponsored:                false,
-		VisitorID:                  "7ddb064a-37a6-4058-92f4-f94000fb00cf",
-		UserNextauthID:             "76732ce2-a124-40cb-a0ce-db657d4344b9",
+		VisitorID:                  "7ddb064a-37a6-4058-92f4-f94000fb00cf", // Some random UUID (Unimportant)
+		UserNextAuthID:             "76732ce2-a124-40cb-a0ce-db657d4344b9", // Some random UUID (Unimportant)
+		FrontendContextUUID:        "4dbd1a93-30c5-4169-b6df-4db9effe7465", // Some random UUID (Unimportant)
 		PromptSource:               "user",
-		QuerySource:                "followup",
-		LocalSearchEnabled:         true,
+		QuerySource:                "home",
 		BrowserHistorySummary:      []string{},
 		IsIncognito:                false,
 		UseSchematizedAPI:          true,
@@ -215,18 +158,39 @@ func (b *RequestBody) Default() *RequestBody {
 			"answer_modes", "media_items", "knowledge_cards", "inline_entity_cards",
 			"place_widgets", "finance_widgets", "sports_widgets", "shopping_widgets",
 			"jobs_widgets", "search_result_widgets", "entity_list_answer", "todo_list",
+			"clarification_responses",
 		},
 		ClientCoordinates:        nil,
 		IsNavSuggestionsDisabled: false,
-		FollowupSource:           "link",
 		Version:                  "2.18",
 	}
-	b.QueryStr = "Default query: Give me some golang code examples"
+	b.QueryStr = "This important query is good :)" // [!] Message sent to the chat session
 
 	return b
 }
 
-func (h *RequestHeaders) IntoJSON() ([]byte, error) {
+func (b *Body) ToFollowup(ChatUUID string) *Body {
+	readWriteToken := uuid.NewString()
+	targetCollectionUUID := uuid.NewString()
+	followupSource := "link"
+
+	b.Params.LastBackendUUID = &ChatUUID
+	b.Params.ReadWriteToken = &readWriteToken
+	b.Params.SearchRecencyFilter = nil
+	b.Params.TargetCollectionUUID = &targetCollectionUUID
+	b.Params.QuerySource = "followup"
+	b.Params.FollowupSource = &followupSource
+
+	return b
+}
+
+func (b *Body) IsFollowup() bool {
+	// LastBackendUUID is main chat session identifier
+	// Other parameters not so important to check
+	return b.Params.LastBackendUUID != nil
+}
+
+func (h *Headers) IntoJSON() ([]byte, error) {
 	JSON, err := json.Marshal(&h)
 	if err != nil {
 		log.Fatal().Msgf("Error marshaling headers: %v", err)
@@ -234,7 +198,7 @@ func (h *RequestHeaders) IntoJSON() ([]byte, error) {
 	return JSON, nil
 }
 
-func (b *RequestBody) IntoJSON() ([]byte, error) {
+func (b *Body) IntoJSON() ([]byte, error) {
 	JSON, err := json.Marshal(&b)
 	if err != nil {
 		log.Fatal().Msgf("Error marshaling body: %v", err)
