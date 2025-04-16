@@ -31,7 +31,10 @@ func main() {
 	http.HandleFunc("/v1/chat/completions", server.AuthMiddleware(server.HandleChatCompletions))
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, err := w.Write([]byte("OK"))
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to write health response")
+		}
 	})
 
 	log.Info().Msg("OpenAI-compatible server starting on port 8080...")
@@ -40,13 +43,11 @@ func main() {
 		serverErrors <- http.ListenAndServe(":8080", nil)
 	}()
 	go func() {
-		select {
-		case err := <-serverErrors:
-			if err != nil && err != http.ErrServerClosed {
-				log.Fatal().Err(err).Msg("Server error while starting")
-			} else if err == http.ErrServerClosed {
-				log.Info().Msg("Server closed")
-			}
+		err := <-serverErrors
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("Server error while starting")
+		} else if err == http.ErrServerClosed {
+			log.Info().Msg("Server closed")
 		}
 	}()
 

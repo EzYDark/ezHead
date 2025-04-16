@@ -144,7 +144,11 @@ func handleStreamingResponse(w http.ResponseWriter, request openai.ChatCompletio
 		}
 
 		// Write SSE format
-		fmt.Fprintf(w, "data: %s\n\n", data)
+		_, err = fmt.Fprintf(w, "data: %s\n\n", data)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to write streaming response")
+			continue
+		}
 		flusher.Flush()
 
 		// Add a small delay to simulate real streaming
@@ -152,6 +156,9 @@ func handleStreamingResponse(w http.ResponseWriter, request openai.ChatCompletio
 	}
 
 	// Send the [DONE] message
-	fmt.Fprintf(w, "data: [DONE]\n\n")
+	_, err := fmt.Fprintf(w, "data: [DONE]\n\n")
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to write streaming response")
+	}
 	flusher.Flush()
 }

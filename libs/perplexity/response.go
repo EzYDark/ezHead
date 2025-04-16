@@ -206,7 +206,7 @@ func (fm *FinalMessage) GetFinalAnswer() (string, error) {
 		}
 	}
 
-	return "", errors.New("No final step found")
+	return "", errors.New("no final step found")
 }
 
 // ParsedTime returns the UpdatedDatetime as a time.Time
