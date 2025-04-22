@@ -3,112 +3,34 @@ package request
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 )
 
-func (s *Script) Update(headers *Headers, body *Body) *Script {
+func (s *Script) Update(headers *Headers, body *Body) (*Script, error) {
 	headersJSON, err := headers.IntoJSON()
 	if err != nil {
-		log.Fatal().Msgf("Failed to convert headers to JSON: %v", err)
+		return nil, fmt.Errorf("failed to convert headers to JSON:\n%v", err)
 	}
 	bodyJSON, err := body.IntoJSON()
 	if err != nil {
-		log.Fatal().Msgf("Failed to convert body to JSON: %v", err)
+		return nil, fmt.Errorf("failed to convert body to JSON:\n%v", err)
 	}
 
-	jscript := fmt.Sprintf(`
-async () => {
-    // ADDED: Top-level try block to catch ANY error within the async function
-    try {
-        const url = "https://www.perplexity.ai/rest/sse/perplexity_ask";
-        // Directly use the injected JSON strings. JS will parse them.
-        const headers = %s;
-        const body = %s;
+	reqScriptPath := "./libs/perplexity/request/req_script.js"
+	reqScriptBytes, err := os.ReadFile(reqScriptPath)
+	if err != nil {
+		// Handle the error if the file cannot be read.
+		return nil, fmt.Errorf("error reading file '%s':\n%v", reqScriptPath, err)
+	}
 
-        // Inner try specifically for the fetch/stream operation
-        try {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: headers, // headers is now a JS object
-                body: JSON.stringify(body), // body needs stringification for fetch
-                credentials: "include", // Important for cookies/session
-                mode: "cors",
-            });
+	// Convert the byte slice to a string.
+	reqScriptContent := string(reqScriptBytes)
 
-            // Check response status IN the inner try block
-            if (!response.ok) {
-                 // Throw detailed error to be caught by INNER catch
-                throw new Error('HTTP error! Status: ' + response.status + ' ' + response.statusText);
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let finalMessage = null; // Keep track of the final message
-            let buffer = "";
-            // Removed 'messages' array since onlyFinal is true
-
-            try { // Added try/finally specifically around reader loop
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split("\n");
-                    buffer = lines.pop() || ""; // Keep remaining partial line
-
-                    for (const line of lines) {
-                        if (line.startsWith("data: ")) {
-                            const data = line.substring(6).trim();
-                            if (data && data !== ":heartbeat" && data !== "[DONE]") {
-                                try {
-                                    const parsedData = JSON.parse(data);
-                                    // Always track the latest potential final message
-                                    if (parsedData.final_sse_message === true) {
-                                        finalMessage = parsedData;
-                                    }
-                                    // You might want to process/store intermediate data here
-                                    // if needed even when onlyFinal=true, e.g., for debugging.
-                                } catch (parseError) {
-                                    console.warn("Failed to parse SSE JSON:", parseError.message, "Data:", data);
-                                    // Decide if a parse error should stop everything
-                                    // throw new Error("SSE JSON parse error: " + parseError.message);
-                                }
-                            }
-                        }
-                    }
-                }
-            } finally {
-                 // Ensure reader is released even if loop errors out
-                 if (reader) {
-                     reader.releaseLock();
-                 }
-            }
-
-
-            // Return success object from the INNER try block
-            return { success: true, finalMessage: finalMessage }; // Simplified for onlyFinal=true
-
-        } catch (fetchOrStreamError) {
-             // This catches errors from fetch, response.ok check, reader, or parsing
-            console.error("INNER CATCH (Fetch/Stream Error):", fetchOrStreamError.name, fetchOrStreamError.message);
-            // Re-throw to be caught by the outer catch block
-            throw fetchOrStreamError;
-        }
-
-    // ADDED: Top-level catch block
-    } catch (error) {
-        // This catches setup errors (JSON.parse) or errors re-thrown from inner catch
-        console.error("OUTER CATCH (Top-Level JS Error):", error.name, error.message);
-        // Return a simple, serializable error object from the outer catch
-        // Ensure error.message is included, provide default if it's missing
-        return { success: false, error: error.message || 'Unknown JS execution error' };
-    }
-};
-	`, headersJSON, bodyJSON)
-	rs := Script(jscript)
-	return &rs
+	reqScript := fmt.Sprintf(reqScriptContent, headersJSON, bodyJSON)
+	rs := Script(reqScript)
+	return &rs, nil
 }
 
 func (h *Headers) Default() *Headers {
@@ -134,14 +56,15 @@ func (h *Headers) Default() *Headers {
 
 func (b *Body) Default() *Body {
 	b.Params = Params{
-		Attachments:                []string{},
-		Language:                   "en-US",
-		Timezone:                   "Europe/Prague",
-		SearchFocus:                "internet",
-		Sources:                    []string{"web", "scholar", "social"},
-		FrontendUUID:               "7eb6747b-9df3-4821-be2e-40c2fe5e7476", // Some random UUID (Unimportant)
-		Mode:                       "copilot",
-		ModelPreference:            "gemini2flash",
+		Attachments:  []string{},
+		Language:     "en-US",
+		Timezone:     "Europe/Prague",
+		SearchFocus:  "internet",
+		Sources:      []string{"web", "scholar", "social"},
+		FrontendUUID: "7eb6747b-9df3-4821-be2e-40c2fe5e7476", // Some random UUID (Unimportant)
+		Mode:         "copilot",
+		// ModelPreference:         "gemini2flash",
+		ModelPreference:            "claude37sonnetthinking",
 		SearchRecencyFilter:        nil,
 		IsRelatedQuery:             false,
 		IsSponsored:                false,
@@ -193,7 +116,7 @@ func (b *Body) IsFollowup() bool {
 func (h *Headers) IntoJSON() ([]byte, error) {
 	JSON, err := json.Marshal(&h)
 	if err != nil {
-		log.Fatal().Msgf("Error marshaling headers: %v", err)
+		return nil, fmt.Errorf("error marshaling headers: %v", err)
 	}
 	return JSON, nil
 }
@@ -201,7 +124,7 @@ func (h *Headers) IntoJSON() ([]byte, error) {
 func (b *Body) IntoJSON() ([]byte, error) {
 	JSON, err := json.Marshal(&b)
 	if err != nil {
-		log.Fatal().Msgf("Error marshaling body: %v", err)
+		return nil, fmt.Errorf("error marshaling body: %v", err)
 	}
 	return JSON, nil
 }

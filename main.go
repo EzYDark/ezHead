@@ -11,12 +11,14 @@ import (
 	"github.com/ezydark/ezHead/libs/api/client"
 	"github.com/ezydark/ezHead/libs/api/server"
 	"github.com/ezydark/ezHead/libs/perplexity"
+	"github.com/ezydark/ezHead/libs/perplexity/response"
 	"github.com/ezydark/ezforce/libs/logger"
 	"github.com/fatih/color"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/rs/zerolog/log"
+	"github.com/ysmood/gson"
 )
 
 func main() {
@@ -33,7 +35,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte("OK"))
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to write health response")
+			log.Error().Msgf("Failed to write health response:\n%v", err)
 		}
 	})
 
@@ -45,13 +47,16 @@ func main() {
 	go func() {
 		err := <-serverErrors
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatal().Err(err).Msg("Server error while starting")
+			log.Fatal().Msgf("Server error while starting:\n%v", err)
 		} else if err == http.ErrServerClosed {
 			log.Info().Msg("Server closed")
 		}
 	}()
 
-	client.TestServer()
+	err = client.TestServer()
+	if err != nil {
+		log.Fatal().Msgf("Failed to test API server:\n%v", err)
+	}
 
 	// time.Sleep(time.Hour)
 
@@ -87,6 +92,30 @@ func main() {
 	})
 	page.MustSetViewport(1920, 1080, 1.0, false)
 
+	_ = page.MustExpose("goLogInfo", func(g gson.JSON) (any, error) {
+		log.Info().Msgf("[JS] %v", g.Str())
+		return nil, nil
+	})
+
+	_ = page.MustExpose("goProcessStreamChunk", func(chunk gson.JSON) (any, error) {
+		_, err := response.ProcessStreamChunk(chunk)
+		if err != nil {
+			log.Fatal().Msgf("Error processing stream chunk:\n%v", err)
+		}
+
+		return nil, nil
+	})
+
+	_ = page.MustExpose("goLogError", func(g gson.JSON) (any, error) {
+		log.Error().Msgf("[JS] %v", g.Str())
+		return nil, nil
+	})
+
+	_ = page.MustExpose("goLogFatal", func(g gson.JSON) (any, error) {
+		log.Fatal().Msgf("[JS] %v", g.Str())
+		return nil, nil
+	})
+
 	perplex, err := perplexity.Init()
 	if err != nil {
 		log.Fatal().Msgf("Could not initialize Perplexity struct:\n%v", err)
@@ -98,16 +127,16 @@ func main() {
 		if scanner.Scan() {
 			query := scanner.Text()
 
-			res, err := perplex.SendRequest(page, query)
+			err := perplex.SendRequest(page, query)
 			if err != nil {
 				log.Fatal().Msgf("Could not send request to Perplexity:\n%v", err)
 			}
 
-			finalAnswer, err := res.FinalMessage.GetFinalAnswer()
-			if err != nil {
-				log.Fatal().Msgf("Could not get final answer from Perplexity:\n%v", err)
-			}
-			log.Info().Msgf("Final Answer:\n%s", finalAnswer)
+			// finalAnswer, err := res.FinalMessage.GetFinalAnswer()
+			// if err != nil {
+			// 	log.Fatal().Msgf("Could not get final answer from Perplexity:\n%v", err)
+			// }
+			// log.Info().Msgf("Final Answer:\n%s", finalAnswer)
 		}
 
 		if err := scanner.Err(); err != nil {

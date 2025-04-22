@@ -14,11 +14,13 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	// log.Debug().Msgf("Got request:\n%v", r)
 
 	if r.Method == http.MethodOptions {
+		log.Debug().Msg("Handling OPTIONS request")
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
 	if r.Method != http.MethodPost {
+		log.Error().Msg("Method not allowed")
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -26,23 +28,25 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	// Parse the request body into OpenAI's type
 	var request openai.ChatCompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		log.Error().Msgf("Invalid request format:\n%v", err)
 		http.Error(w, "Invalid request format", http.StatusBadRequest)
 		return
 	}
 
 	pretty, err := json.MarshalIndent(request, "", "    ")
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to marshal request 'pretty'")
+		log.Fatal().Msgf("Failed to marshal request 'pretty':\n%v", err)
 	}
 	log.Debug().Msgf("Request parsed:\n%v", string(pretty))
 
 	prettyMessages, err := json.MarshalIndent(request.Messages, "", "    ")
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to marshal request 'prettyMessages'")
+		log.Fatal().Msgf("Failed to marshal request 'prettyMessages':\n%v", err)
 	}
 	log.Debug().Msgf("Request Messages:\n%v", string(prettyMessages))
 
 	if request.Stream {
+		log.Debug().Msg("Continuing streaming the response")
 		handleStreamingResponse(w, request)
 		return
 	}
@@ -58,9 +62,10 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	err = json.NewEncoder(w).Encode(response)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to encode response")
+		log.Fatal().Msgf("Failed to encode response:\n%v", err)
 	}
-	log.Debug().Msgf("Sent response")
+
+	log.Debug().Msgf("Sent successfully a response")
 }
 
 func ProcessChat(request openai.ChatCompletionRequest) openai.ChatCompletionResponse {
@@ -102,6 +107,7 @@ func handleStreamingResponse(w http.ResponseWriter, request openai.ChatCompletio
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
+		log.Error().Msg("Streaming not supported")
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
 		return
 	}
@@ -111,7 +117,7 @@ func handleStreamingResponse(w http.ResponseWriter, request openai.ChatCompletio
 
 	// Split response into chunks
 	// response := "This is a response from your custom implementation"
-	chunks := []string{"This is ", "a response ", "from your ", "custom ", "implementation"}
+	chunks := []string{"This is ", "a response ", "from your ", "custom ", "streaming ", "implementation"}
 
 	for i, chunk := range chunks {
 		// Create a streaming chunk
@@ -139,15 +145,13 @@ func handleStreamingResponse(w http.ResponseWriter, request openai.ChatCompletio
 		// Encode to JSON
 		data, err := json.Marshal(streamEvent)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to marshal streaming response")
-			continue
+			log.Fatal().Msgf("Failed to marshal streaming response:\n%v", err)
 		}
 
 		// Write SSE format
 		_, err = fmt.Fprintf(w, "data: %s\n\n", data)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to write streaming response")
-			continue
+			log.Fatal().Msgf("Failed to write streaming response:\n%v", err)
 		}
 		flusher.Flush()
 
@@ -158,7 +162,7 @@ func handleStreamingResponse(w http.ResponseWriter, request openai.ChatCompletio
 	// Send the [DONE] message
 	_, err := fmt.Fprintf(w, "data: [DONE]\n\n")
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to write streaming response")
+		log.Fatal().Msgf("Failed to write streaming response:\n%v", err)
 	}
 	flusher.Flush()
 }

@@ -2,12 +2,13 @@ package client
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog/log"
 	"github.com/sashabaranov/go-openai"
 )
 
-func TestServer() {
+func TestServer() error {
 	config := openai.DefaultConfig("your-test-token")
 	config.BaseURL = "http://localhost:8080/v1" // Point to your local server
 
@@ -28,9 +29,10 @@ func TestServer() {
 	)
 
 	if err != nil {
-		log.Printf("Error: %v\n", err)
-		return
+		return fmt.Errorf("error creating chat completion:\n%v", err)
 	}
 
-	log.Info().Msgf("Test Response: %s\n", resp.Choices[0].Message.Content)
+	log.Debug().Msgf("Test Response: %s\n", resp.Choices[0].Message.Content)
+
+	return nil
 }

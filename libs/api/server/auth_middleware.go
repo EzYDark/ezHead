@@ -13,12 +13,14 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		apiKey := r.Header.Get("Authorization")
 		if apiKey == "" || !strings.HasPrefix(apiKey, "Bearer ") {
+			log.Error().Msg("Invalid API key. No API key or no Bearer prefix.")
 			http.Error(w, "Unauthorized: Invalid API key", http.StatusUnauthorized)
 			return
 		}
 
 		// key := strings.TrimPrefix(apiKey, "Bearer ")
 		if false {
+			log.Error().Msg("Invalid API key")
 			http.Error(w, "Unauthorized: Invalid API key", http.StatusUnauthorized)
 			return
 		}
