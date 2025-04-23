@@ -26,12 +26,12 @@ type Params struct {
 	Language                   string   `json:"language"`
 	Timezone                   string   `json:"timezone"`
 	SearchFocus                string   `json:"search_focus"`
-	Sources                    []string `json:"sources"`
+	Sources                    Sources  `json:"sources"`
 	SearchRecencyFilter        *string  `json:"search_recency_filter,omitempty"`
 	FrontendUUID               string   `json:"frontend_uuid"`
 	Mode                       string   `json:"mode"`
 	TargetCollectionUUID       *string  `json:"target_collection_uuid,omitempty"`
-	ModelPreference            string   `json:"model_preference"`
+	ModelPreference            Models   `json:"model_preference"`
 	IsRelatedQuery             bool     `json:"is_related_query"`
 	IsSponsored                bool     `json:"is_sponsored"`
 	VisitorID                  string   `json:"visitor_id"`
@@ -56,3 +56,37 @@ type Body struct {
 }
 
 type Script string
+
+// Perplexity`s provided models with names used in their API calls
+type Models string
+
+const (
+	Claude_3_7_Thinking Models = "claude37sonnetthinking"
+	Claude_3_7          Models = "claude2"
+	Gemini_2_5_Pro      Models = "gemini2flash"
+	Grok_3              Models = "grok"
+	O4_Mini             Models = "o4mini"
+	R1_1776             Models = "r1"
+	GPT_4_1             Models = "gpt41"
+	Sonar               Models = "experimental"
+	Best                Models = "pplx_pro"
+)
+
+// TEMP: move to proper seperate file from here
+// Supported LLM providers
+type Providers string
+
+const (
+	Perplexity Providers = "perplexity"
+	OpenAI     Providers = "openai" // TODO
+)
+
+// Perplexity`s provided search sources with names used in their API calls
+type SourceType string
+type Sources []SourceType
+
+const (
+	Web      SourceType = "web"
+	Academic SourceType = "scholar"
+	Social   SourceType = "social"
+)

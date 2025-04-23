@@ -56,15 +56,14 @@ func (h *Headers) Default() *Headers {
 
 func (b *Body) Default() *Body {
 	b.Params = Params{
-		Attachments:  []string{},
-		Language:     "en-US",
-		Timezone:     "Europe/Prague",
-		SearchFocus:  "internet",
-		Sources:      []string{"web", "scholar", "social"},
-		FrontendUUID: "7eb6747b-9df3-4821-be2e-40c2fe5e7476", // Some random UUID (Unimportant)
-		Mode:         "copilot",
-		// ModelPreference:         "gemini2flash",
-		ModelPreference:            "claude37sonnetthinking",
+		Attachments:                []string{},
+		Language:                   "en-US",
+		Timezone:                   "Europe/Prague",
+		SearchFocus:                "internet",
+		Sources:                    Sources{Web, Academic, Social},
+		FrontendUUID:               "7eb6747b-9df3-4821-be2e-40c2fe5e7476", // Some random UUID (Unimportant)
+		Mode:                       "copilot",
+		ModelPreference:            Models(Claude_3_7_Thinking),
 		SearchRecencyFilter:        nil,
 		IsRelatedQuery:             false,
 		IsSponsored:                false,

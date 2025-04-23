@@ -13,6 +13,8 @@ type PerplexityReq struct {
 	ReqScript  *request.Script
 }
 
+var PerplexPage *rod.Page
+
 // Initialize new chat session on Perplexity
 func Init() (*PerplexityReq, error) {
 	new_perplex := &PerplexityReq{
@@ -55,24 +57,28 @@ func (p *PerplexityReq) SendRequest(page *rod.Page, query string) error {
 	page.MustWaitStable()
 
 	// Run JS script and send the request
-	_ = page.MustEval(string(*p.ReqScript))
+	result := page.MustEval(string(*p.ReqScript))
 
 	// Convert result from the JS script to JSON
-	// _, err = result.MarshalJSON()
-	// if err != nil {
-	// 	log.Fatal().Msgf("Could not convert result to JSON:\n%v", err)
-	// }
+	_, err = result.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("failed to convert result to JSON:\n%w", err)
+	}
 
-	// Parse the JSON response to proper Golang struct
-	// var perplexityResponse Response
+	// // Parse the JSON response to proper Golang struct
+	// var perplexityResponse types.Response
 	// if err := json.Unmarshal(resultJSON, &perplexityResponse); err != nil {
-	// 	log.Fatal().Msgf("Error parsing result:\n%v", err)
+	// 	return fmt.Errorf("failed to parse result:\n%w", err)
 	// }
 
 	// // Set specific chat session identifier to allow followup messages
 	// if !p.ReqBody.IsFollowup() {
-	// 	p.ReqBody.ToFollowup(perplexityResponse.FinalMessage.BackendUUID)
-	// 	p.ReqScript = p.ReqScript.Update(p.ReqHeaders, p.ReqBody)
+	// 	p.ReqBody.ToFollowup(perplexityResponse.BackendUUID)
+	// 	script, err := p.ReqScript.Update(p.ReqHeaders, p.ReqBody)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to update request script:\n%w", err)
+	// 	}
+	// 	p.ReqScript = script
 	// }
 
 	return nil

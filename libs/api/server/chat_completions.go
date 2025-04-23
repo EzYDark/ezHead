@@ -4,11 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/ezydark/ezHead/libs/perplexity"
+	"github.com/ezydark/ezHead/libs/perplexity/request"
 	"github.com/rs/zerolog/log"
 	"github.com/sashabaranov/go-openai"
 )
+
+var Chunks []string
 
 func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	// log.Debug().Msgf("Got request:\n%v", r)
@@ -25,35 +30,98 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse the request body into OpenAI's type
-	var request openai.ChatCompletionRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+	// Parse the req body into OpenAI's type
+	var req openai.ChatCompletionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Error().Msgf("Invalid request format:\n%v", err)
 		http.Error(w, "Invalid request format", http.StatusBadRequest)
 		return
 	}
 
-	pretty, err := json.MarshalIndent(request, "", "    ")
+	// Initialize Perplexity struct
+	perplex, err := perplexity.Init()
 	if err != nil {
-		log.Fatal().Msgf("Failed to marshal request 'pretty':\n%v", err)
+		log.Fatal().Msgf("Could not initialize Perplexity struct:\n%v", err)
 	}
-	log.Debug().Msgf("Request parsed:\n%v", string(pretty))
 
-	prettyMessages, err := json.MarshalIndent(request.Messages, "", "    ")
+	// "model:claude-3.7-thinking//provider:perplexity//search:web--academic--social"
+	if req.Model == "" {
+		msg := "Model is required (with optional `//` parameters)"
+		log.Error().Msg(msg)
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
+	if strings.Contains(req.Model, "//") {
+		sections := strings.SplitSeq(req.Model, "//")
+
+		for section := range sections {
+			if !strings.Contains(section, ":") {
+				msg := "Provided model string has invalid format"
+				log.Error().Msg(msg)
+				http.Error(w, msg, http.StatusBadRequest)
+				return
+			}
+
+			parts := strings.SplitN(section, ":", 2)
+			key := parts[0]
+			value := parts[1]
+
+			switch key {
+			case "model":
+				perplex.ReqBody.Params.ModelPreference = getModelName(value)
+			case "provider":
+				switch value {
+				case string(request.Perplexity):
+					// TODO
+				case string(request.OpenAI):
+					// TODO
+				}
+			case "search":
+				searchItems := strings.Split(value, "--")
+				for _, item := range searchItems {
+					switch item {
+					case "web":
+						perplex.ReqBody.Params.Sources = append(perplex.ReqBody.Params.Sources, request.Web)
+					case "academic":
+						perplex.ReqBody.Params.Sources = append(perplex.ReqBody.Params.Sources, request.Academic)
+					case "social":
+						perplex.ReqBody.Params.Sources = append(perplex.ReqBody.Params.Sources, request.Social)
+					}
+				}
+			}
+		}
+	} else {
+		// If no "//" in the model string, probably just provided the model name
+		perplex.ReqBody.Params.ModelPreference = getModelName(req.Model)
+	}
+
+	err = perplex.SendRequest(perplexity.PerplexPage, req.Messages[len(req.Messages)-1].Content)
 	if err != nil {
-		log.Fatal().Msgf("Failed to marshal request 'prettyMessages':\n%v", err)
+		log.Error().Msgf("Failed to send request to Perplexity API:\n%v", err)
+		return
 	}
-	log.Debug().Msgf("Request Messages:\n%v", string(prettyMessages))
 
-	if request.Stream {
+	// pretty, err := json.MarshalIndent(req, "", "    ")
+	// if err != nil {
+	// 	log.Fatal().Msgf("Failed to marshal request 'pretty':\n%v", err)
+	// }
+	// log.Debug().Msgf("Request parsed:\n%v", string(pretty))
+
+	// prettyMessages, err := json.MarshalIndent(req.Messages, "", "    ")
+	// if err != nil {
+	// 	log.Fatal().Msgf("Failed to marshal request 'prettyMessages':\n%v", err)
+	// }
+	// log.Debug().Msgf("Request Messages:\n%v", string(prettyMessages))
+
+	if req.Stream {
 		log.Debug().Msg("Continuing streaming the response")
-		handleStreamingResponse(w, request)
+		handleStreamingResponse(w, req)
 		return
 	}
 
 	// Process the request with your custom logic
 	// This is where you'd connect to your actual LLM implementation
-	response := ProcessChat(request)
+	response := ProcessChat(req)
 
 	// Return the response using OpenAI's response type
 	w.Header().Set("Content-Type", "application/json")
@@ -66,6 +134,34 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Debug().Msgf("Sent successfully a response")
+}
+
+func getModelName(reqModel string) request.Models {
+	switch reqModel {
+	case "claude-3.7-thinking":
+		return request.Claude_3_7_Thinking
+	case "claude-3.7":
+		return request.Claude_3_7
+	case "gemini-2.5-pro":
+		return request.Gemini_2_5_Pro
+	case "grok-3":
+		return request.Grok_3
+	case "o4-mini":
+		return request.O4_Mini
+	case "r1-1776":
+		return request.R1_1776
+	case "gpt-4.1":
+		return request.GPT_4_1
+	case "sonar":
+		return request.Sonar
+	case "best":
+		return request.Best
+	case "auto":
+		return request.Best // The same as the `best` model. Just for convenience.
+	default:
+		log.Info().Msg("No model specified. Using provider`s default model.")
+		return request.Best
+	}
 }
 
 func ProcessChat(request openai.ChatCompletionRequest) openai.ChatCompletionResponse {
@@ -85,7 +181,7 @@ func ProcessChat(request openai.ChatCompletionRequest) openai.ChatCompletionResp
 				Index: 0,
 				Message: openai.ChatCompletionMessage{
 					Role:    openai.ChatMessageRoleAssistant,
-					Content: "This is a response from your custom implementation",
+					Content: "This is a response from your custom NON-streaming implementation",
 				},
 				FinishReason: openai.FinishReasonStop,
 			},
@@ -97,10 +193,12 @@ func ProcessChat(request openai.ChatCompletionRequest) openai.ChatCompletionResp
 		},
 	}
 
+	Chunks = nil
+
 	return response
 }
 
-func handleStreamingResponse(w http.ResponseWriter, request openai.ChatCompletionRequest) {
+func handleStreamingResponse(w http.ResponseWriter, req openai.ChatCompletionRequest) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -115,34 +213,37 @@ func handleStreamingResponse(w http.ResponseWriter, request openai.ChatCompletio
 	// Generate a response ID
 	uniqueID := fmt.Sprintf("chatcmpl-%d", time.Now().UnixNano())
 
-	// Split response into chunks
-	// response := "This is a response from your custom implementation"
-	chunks := []string{"This is ", "a response ", "from your ", "custom ", "streaming ", "implementation"}
+	chunkIndex := 0
+	for {
+		if len(Chunks) == 0 || chunkIndex >= len(Chunks) {
+			log.Debug().Msg("No chunks available. Waiting for new chunks...")
+			continue
+		} else if chunkIndex == len(Chunks)-1 && Chunks[len(Chunks)-1] == "[END]" {
+			log.Debug().Msg("All chunks processed")
+			Chunks = nil
+			break
+		}
 
-	for i, chunk := range chunks {
-		// Create a streaming chunk
 		streamEvent := openai.ChatCompletionStreamResponse{
 			ID:      uniqueID,
 			Object:  "chat.completion.chunk",
 			Created: time.Now().Unix(),
-			Model:   request.Model,
+			Model:   req.Model,
 			Choices: []openai.ChatCompletionStreamChoice{
 				{
 					Index: 0,
 					Delta: openai.ChatCompletionStreamChoiceDelta{
-						Content: chunk,
+						Content: Chunks[chunkIndex],
 					},
 					FinishReason: openai.FinishReasonNull,
 				},
 			},
 		}
 
-		// For the last chunk, set the finish reason
-		if i == len(chunks)-1 {
+		if chunkIndex == len(Chunks)-2 && Chunks[len(Chunks)-1] == "[END]" {
 			streamEvent.Choices[0].FinishReason = openai.FinishReasonStop
 		}
 
-		// Encode to JSON
 		data, err := json.Marshal(streamEvent)
 		if err != nil {
 			log.Fatal().Msgf("Failed to marshal streaming response:\n%v", err)
@@ -155,8 +256,7 @@ func handleStreamingResponse(w http.ResponseWriter, request openai.ChatCompletio
 		}
 		flusher.Flush()
 
-		// Add a small delay to simulate real streaming
-		// time.Sleep(100 * time.Millisecond)
+		chunkIndex++
 	}
 
 	// Send the [DONE] message
