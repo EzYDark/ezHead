@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ezydark/ezHead/libs/api/server"
+	"github.com/ezydark/ezHead/libs/openai/server/handles"
 	"github.com/ezydark/ezHead/libs/perplexity/response/types"
 	"github.com/rs/zerolog/log"
 	"github.com/ysmood/gson"
@@ -29,12 +29,12 @@ func ProcessStreamChunk(chunk gson.JSON) (*types.Response, error) {
 		for _, block := range response.Blocks {
 			if block.IntendedUsage == "ask_text" {
 				if block.MarkdownBlock != nil && len(block.MarkdownBlock.Chunks) > 0 {
-					server.Chunks = append(server.Chunks, block.MarkdownBlock.Chunks...)
+					handles.Chunks = append(handles.Chunks, block.MarkdownBlock.Chunks...)
 				}
 			}
 		}
 	} else {
-		server.Chunks = append(server.Chunks, "[END]")
+		handles.Chunks = append(handles.Chunks, "[END]")
 	}
 
 	// Log specific aspects of the response for debugging

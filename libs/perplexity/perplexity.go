@@ -3,6 +3,8 @@ package perplexity
 import (
 	"fmt"
 
+	"github.com/ezydark/ezHead/libs"
+	openai "github.com/ezydark/ezHead/libs/openai/server"
 	"github.com/ezydark/ezHead/libs/perplexity/request"
 	"github.com/go-rod/rod"
 )
@@ -11,25 +13,34 @@ type PerplexityReq struct {
 	ReqHeaders *request.Headers
 	ReqBody    *request.Body
 	ReqScript  *request.Script
+	RodPage    *rod.Page
 }
-
-var PerplexPage *rod.Page
 
 // Initialize new chat session on Perplexity
 func Init() (*PerplexityReq, error) {
 	new_perplex := &PerplexityReq{
-		ReqHeaders: new(request.Headers),
-		ReqBody:    new(request.Body),
-		ReqScript:  new(request.Script),
+		ReqHeaders: nil,
+		ReqBody:    nil,
+		ReqScript:  nil,
+		RodPage:    nil,
 	}
 
 	new_perplex.ReqHeaders = new_perplex.ReqHeaders.Default()
+
 	new_perplex.ReqBody = new_perplex.ReqBody.Default()
 	script, err := new_perplex.ReqScript.Update(new_perplex.ReqHeaders, new_perplex.ReqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update request script:\n%w", err)
 	}
+
 	new_perplex.ReqScript = script
+
+	rod_browser := libs.GetRodBrowser()
+	new_perplex.RodPage = rod_browser.MustPage("https://www.perplexity.ai/")
+
+	libs.SetPageSettings(new_perplex.RodPage)
+	libs.ExposeGoLogger(new_perplex.RodPage)
+	openai.ExposeProcStreamChunk(new_perplex.RodPage)
 
 	return new_perplex, nil
 }

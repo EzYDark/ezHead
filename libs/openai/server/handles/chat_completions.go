@@ -95,7 +95,7 @@ func HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		perplex.ReqBody.Params.ModelPreference = getModelName(req.Model)
 	}
 
-	err = perplex.SendRequest(perplexity.PerplexPage, req.Messages[len(req.Messages)-1].Content)
+	err = perplex.SendRequest(perplex.RodPage, req.Messages[len(req.Messages)-1].Content)
 	if err != nil {
 		log.Error().Msgf("Failed to send request to Perplexity API:\n%v", err)
 		return
