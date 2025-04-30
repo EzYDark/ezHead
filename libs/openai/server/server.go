@@ -6,10 +6,7 @@ import (
 	"net/http"
 
 	"github.com/ezydark/ezHead/libs/openai/server/handles"
-	"github.com/ezydark/ezHead/libs/perplexity/response"
-	"github.com/go-rod/rod"
 	"github.com/rs/zerolog/log"
-	"github.com/ysmood/gson"
 )
 
 type OpenAIServer struct {
@@ -86,17 +83,4 @@ func (oai_server *OpenAIServer) SetPort(port int) (*OpenAIServer, error) {
 	oai_server.port = port
 
 	return oai_server, nil
-}
-
-func ExposeProcStreamChunk(page *rod.Page) *rod.Page {
-	_ = page.MustExpose("goProcessStreamChunk", func(chunk gson.JSON) (any, error) {
-		_, err := response.ProcessStreamChunk(chunk)
-		if err != nil {
-			log.Fatal().Msgf("Error processing stream chunk:\n%v", err)
-		}
-
-		return nil, nil
-	})
-
-	return page
 }

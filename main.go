@@ -9,9 +9,9 @@ import (
 )
 
 func main() {
+	app.InitLogger()
 	log.Info().Msg("Starting ezHead...")
 
-	app.InitLogger()
 	_ = libs.InitAppFolder()
 
 	_ = libs.InitRodBrowser()

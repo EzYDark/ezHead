@@ -193,7 +193,7 @@ func ProcessChat(request openai.ChatCompletionRequest) openai.ChatCompletionResp
 		},
 	}
 
-	Chunks = nil
+	perplexity.ClearResponseChunks()
 
 	return response
 }
@@ -215,12 +215,12 @@ func handleStreamingResponse(w http.ResponseWriter, req openai.ChatCompletionReq
 
 	chunkIndex := 0
 	for {
-		if len(Chunks) == 0 || chunkIndex >= len(Chunks) {
+		if len(perplexity.GetResponseChunks()) == 0 || chunkIndex >= len(perplexity.GetResponseChunks()) {
 			log.Debug().Msg("No chunks available. Waiting for new chunks...")
 			continue
-		} else if chunkIndex == len(Chunks)-1 && Chunks[len(Chunks)-1] == "[END]" {
+		} else if chunkIndex == len(perplexity.GetResponseChunks())-1 && perplexity.GetResponseChunks()[len(perplexity.GetResponseChunks())-1] == "[END]" {
 			log.Debug().Msg("All chunks processed")
-			Chunks = nil
+			perplexity.ClearResponseChunks()
 			break
 		}
 
@@ -233,14 +233,14 @@ func handleStreamingResponse(w http.ResponseWriter, req openai.ChatCompletionReq
 				{
 					Index: 0,
 					Delta: openai.ChatCompletionStreamChoiceDelta{
-						Content: Chunks[chunkIndex],
+						Content: perplexity.GetResponseChunks()[chunkIndex],
 					},
 					FinishReason: openai.FinishReasonNull,
 				},
 			},
 		}
 
-		if chunkIndex == len(Chunks)-2 && Chunks[len(Chunks)-1] == "[END]" {
+		if chunkIndex == len(perplexity.GetResponseChunks())-2 && perplexity.GetResponseChunks()[len(perplexity.GetResponseChunks())-1] == "[END]" {
 			streamEvent.Choices[0].FinishReason = openai.FinishReasonStop
 		}
 

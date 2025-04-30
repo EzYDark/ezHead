@@ -4,9 +4,11 @@ import (
 	"fmt"
 
 	"github.com/ezydark/ezHead/libs"
-	openai "github.com/ezydark/ezHead/libs/openai/server"
 	"github.com/ezydark/ezHead/libs/perplexity/request"
+	"github.com/ezydark/ezHead/libs/perplexity/response"
 	"github.com/go-rod/rod"
+	"github.com/rs/zerolog/log"
+	"github.com/ysmood/gson"
 )
 
 type PerplexityReq struct {
@@ -19,9 +21,9 @@ type PerplexityReq struct {
 // Initialize new chat session on Perplexity
 func Init() (*PerplexityReq, error) {
 	new_perplex := &PerplexityReq{
-		ReqHeaders: nil,
-		ReqBody:    nil,
-		ReqScript:  nil,
+		ReqHeaders: new(request.Headers),
+		ReqBody:    new(request.Body),
+		ReqScript:  new(request.Script),
 		RodPage:    nil,
 	}
 
@@ -40,7 +42,7 @@ func Init() (*PerplexityReq, error) {
 
 	libs.SetPageSettings(new_perplex.RodPage)
 	libs.ExposeGoLogger(new_perplex.RodPage)
-	openai.ExposeProcStreamChunk(new_perplex.RodPage)
+	ExposeProcStreamChunk(new_perplex.RodPage)
 
 	return new_perplex, nil
 }
@@ -117,4 +119,27 @@ func (p *PerplexityReq) SetBody(body *request.Body) error {
 	p.ReqScript = script
 
 	return nil
+}
+
+func ExposeProcStreamChunk(page *rod.Page) *rod.Page {
+	_ = page.MustExpose("goProcessStreamChunk", func(chunk gson.JSON) (any, error) {
+		_, err := response.ProcessStreamChunk(chunk)
+		if err != nil {
+			log.Fatal().Msgf("Error processing stream chunk:\n%v", err)
+		}
+
+		return nil, nil
+	})
+
+	return page
+}
+
+// GetResponseChunks returns the current chunks from the response package
+func GetResponseChunks() []string {
+	return response.ChunkStorage
+}
+
+// ClearResponseChunks clears the chunks in the response package
+func ClearResponseChunks() {
+	response.ChunkStorage = nil
 }
